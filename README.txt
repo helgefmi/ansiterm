@@ -1,4 +1,5 @@
-Pretty simple module for parsing ANSI escape codes in python..
+A virtual terminal for parsing ANSI escape codes in python..
+Call feed() with input and get back output with get_string() or get_tiles(). Supports colors, bold and reverse, and most of the escape codes.
 Works with the game nethack, but i haven't tested it with anything else yet.
 
 helge@helge:~/annet/ansiterm$ telnet nethack.alt.org | tail -n1 > input.txt
