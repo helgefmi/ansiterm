@@ -87,7 +87,7 @@ class Ansiterm:
                 # This section parses the input into the numeric arguments and
                 # the type of sequence. If no numeric arguments are supplied,
                 # we manually insert a 0 or a 1 depending on the sequence type,
-                # because different types has different default values.
+                # because different types have different default values.
                 #
                 # Example 1: \x1b[1;37;40m -> numbers=[1, 37, 40] char=m
                 # Example 2: \x1b[m = numbers=[0] char=m
