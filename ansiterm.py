@@ -22,6 +22,7 @@ class Tile:
         self.color['bold'] = color['bold']
 
 class Ansiterm:
+    escape_parser = re.compile(r'^\x1b\[?([\d;]*)(\w)')
     def __init__(self, rows, cols):
         """Initializes the ansiterm with rows*cols white-on-black spaces"""
         self.rows = rows
@@ -79,49 +80,38 @@ class Ansiterm:
 
     def feed(self, input):
         """Feeds the terminal with input."""
-        re_getnumber = re.compile(r'^(\d+)')
         while len(input) > 0:
             # Translate the cursor into an index into our 1-dimensional tileset.
             curidx = self.cursor['y'] * self.cols + self.cursor['x']
             if input[0] == '\x1b': # Signature of an ANSI escape code
-                input = input[1:]
-                # Sometimes \x1b isn't followed by [, so we check to make sure
-                if input and input[0] == '[':
-                    input = input[1:]
-                
                 # This section parses the input into the numeric arguments and
-                # the type of sequence. If not numeric arguments are supplied,
-                # we manually insert a 0.
+                # the type of sequence. If no numeric arguments are supplied,
+                # we manually insert a 0 or a 1 depending on the sequence type,
+                # because different types has different default values.
                 #
                 # Example 1: \x1b[1;37;40m -> numbers=[1, 37, 40] char=m
                 # Example 2: \x1b[m = numbers=[0] char=m
-
-                numbers = []
-                while True: # untill there's no numbers left ..
-                    match = re_getnumber.match(input)
-                    if match:
-                        number = match.groups()[0]
-                        input = input[len(number):]
-                        numbers.append(int(number))
-
-                        if input[0] == ';':
-                            input = input[1:]
+                match = Ansiterm.escape_parser.match(input)
+                if not match:
+                    raise Exception('Invalid escape sequence, input[:20]=%r' % input[:20])
+                input = input[match.end():]
+                args, char = match.groups()
+                # If arguments are omitted, add the default argument for this sequence.
+                if len(args) == 0:
+                    if char in 'ABCDEFSTf':
+                        numbers = [1]
+                    elif char == 'H':
+                        numbers = [1, 1]
                     else:
-                        break
-                char, input = input[0], input[1:]
-
-                if len(numbers) == 0:
-                    numbers.append(0)
+                        numbers = [0]
+                else:
+                    numbers = map(int, args.split(';'))
 
                 # Check for known escape sequences and execute them.
                 if char == 'H': # Sets cursor
-                    if len(numbers) == 1: # (\x1b[H -> \x1b[1;1H)
-                        assert numbers[0] == 0
-                        numbers = [1, 1]
-                    
                     self.cursor['y'] = numbers[0] - 1 # 1-based indexes
                     self.cursor['x'] = numbers[1] - 1 #
-                elif char == 'm' or char == 'M': # Sets SGR parameters
+                elif char == 'm' or char == 'M': # Sets color/boldness
                     for num in numbers:
                         self._parse_sgr(num)
                 elif char == 'J': # Clears (parts of) the screen.
@@ -131,7 +121,7 @@ class Ansiterm:
                     # From beginning to cursor
                     elif numbers[0] == 1:
                         range_ = (0, curidx)
-                    # Clears the whole screen
+                    # The whole screen
                     elif numbers[0] == 2:
                         range_ = (0, self.cols * self.rows - 1)
                     else:
@@ -139,10 +129,13 @@ class Ansiterm:
                     for i in xrange(*range_):
                         self.tiles[i].reset()
                 elif char == 'K': # Clears (parts of) the line
+                    # From cursor to end of line
                     if numbers[0] == 0:
                         range_ = (curidx, curidx + self.cols - self.cursor['x'] - 1)
+                    # From beginning of line to cursor
                     elif numbers[0] == 1:
                         range_ = (curidx % self.cols, curidx)
+                    # The whole line
                     elif numbers[0] == 2:
                         range_ = (curidx % self.cols, curidx % self.cols + self.cols)
                     else:
@@ -150,13 +143,13 @@ class Ansiterm:
                     for i in xrange(*range_):
                         self.tiles[i].reset()
                 elif char == 'A': # Move cursor up
-                    self.cursor['y'] -= 1 if not numbers else (numbers[0] + 1)
+                    self.cursor['y'] -= 1 if not numbers else (numbers[0])
                 elif char == 'B': # Move cursor down
-                    self.cursor['y'] += 1 if not numbers else (numbers[0] + 1)
+                    self.cursor['y'] += 1 if not numbers else (numbers[0])
                 elif char == 'C': # Move cursor right
-                    self.cursor['x'] += 1 if not numbers else (numbers[0] + 1)
+                    self.cursor['x'] += 1 if not numbers else (numbers[0])
                 elif char == 'D': # Move cursor left
-                    self.cursor['x'] -= 1 if not numbers else (numbers[0] + 1)
+                    self.cursor['x'] -= 1 if not numbers else (numbers[0])
                 elif char == 'r' or char == 'l': # TODO
                     pass
                 else:
@@ -165,15 +158,15 @@ class Ansiterm:
                 # If we end up here, the character should should just be
                 # added to the current tile and the cursor should be updated.
                 # Some characters such as \r, \n will only affect the cursor.
-                # TODO: Find out exactly what should be accepted here
-                #       i.e. only ASCII-7?
+                # TODO: Find out exactly what should be accepted here.
+                #       Only ASCII-7 perhaps?
                 a = input[0]
                 if a == '\r':
                     self.cursor['x'] = 0
                 elif a == '\b':
-                    self.cursor['x'] = self.cursor['x'] - 1
+                    self.cursor['x'] -= 1
                 elif a == '\n':
-                    self.cursor['y'] = self.cursor['y'] + 1
+                    self.cursor['y'] += 1
                 elif a == '\x0f' or a == '\x00':
                     pass
                 else:
