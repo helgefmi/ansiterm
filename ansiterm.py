@@ -7,7 +7,7 @@ class Tile:
         self.reset()
     
     def reset(self):
-        """Resets the tile to a white space on black background"""
+        """Resets the tile to a white-on-black space"""
         self.color = {
             'fg': 37, 'bg': 40,
             'reverse': False,
@@ -102,7 +102,7 @@ class Ansiterm:
 
         args, char = match.groups()
         # If arguments are omitted, add the default argument for this sequence.
-        if len(args) == 0:
+        if not args:
             if char in 'ABCDEFSTf':
                 numbers = [1]
             elif char == 'H':
@@ -167,16 +167,16 @@ class Ansiterm:
                 self.tiles[i].reset()
         # Move cursor up
         elif char == 'A':
-            self.cursor['y'] -= 1 if not numbers else (numbers[0])
+            self.cursor['y'] -= numbers[0]
         # Move cursor down
         elif char == 'B':
-            self.cursor['y'] += 1 if not numbers else (numbers[0])
+            self.cursor['y'] += numbers[0]
         # Move cursor right
         elif char == 'C':
-            self.cursor['x'] += 1 if not numbers else (numbers[0])
+            self.cursor['x'] += numbers[0]
         # Move cursor left
         elif char == 'D':
-            self.cursor['x'] -= 1 if not numbers else (numbers[0])
+            self.cursor['x'] -= numbers[0]
         elif char == 'r' or char == 'l': # TODO
             pass
         else:
@@ -185,7 +185,7 @@ class Ansiterm:
 
     def feed(self, input):
         """Feeds the terminal with input."""
-        while len(input) > 0:
+        while input:
             # If the input starts with \x1b, try to parse end evaluate a
             # sequence.
             parsed, input = self._parse_sequence(input)
